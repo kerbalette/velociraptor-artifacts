@@ -1,0 +1,19 @@
+name: Pack.Windows.RDPHistory
+description: |
+   Gets the hosts and usernames from users regsitry of RDP hosts they have connected to.
+
+type: CLIENT
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        LET KeyGlob = "SOFTWARE\\Microsoft\\Terminal Server Client\\Servers\\*\\*"
+
+
+        LET results = SELECT Username, parse_string_with_regex(string=FullPath, regex="Servers%5C(?P<externalIP>.*)%5C") AS externalIP, 
+                        Data.value AS externalUsername 
+                        FROM Artifact.Windows.Registry.NTUser(KeyGlob=KeyGlob)
+    
+        SELECT Username, externalIP.externalIP AS externalIP, externalUsername FROM results
