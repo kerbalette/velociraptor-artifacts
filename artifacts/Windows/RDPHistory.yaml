@@ -1,4 +1,4 @@
-name: Pack.Windows.RDPHistory
+name: Pack.Acme.Windows.RDPHistory
 description: |
    Gets the hosts and usernames from users regsitry of RDP hosts they have connected to.
 
