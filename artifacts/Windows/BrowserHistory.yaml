@@ -1,0 +1,38 @@
+name: Packs.Acme.Windows.Browser.Histories
+description: |
+   Uses nirsoft BrowserHistoryViewer to get all browser histories. This has been superceeded
+   by the official artifact 'Windows.Applications.NirsoftBrowserViewer'
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+
+tools:
+  - name: NirsoftBrowsingHistoryView64
+    url: https://github.com/Velocidex/Tools/raw/main/BrowsingHistoryView/BrowsingHistoryView-amd64.exe
+    serve_locally: true
+
+required_permissions:
+  - EXECVE
+  
+parameters:
+   - name: BrowsingHistoryViewArgs
+     default: "/HistorySource 1 /scomma history.csv"
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        LET os_info <= SELECT Architecture FROM info()
+
+        LET bin <= SELECT * FROM Artifact.Generic.Utils.FetchBinary(ToolName= "BrowsingHistoryView_" + os_info[0].Architecture, ToolInfo=ToolInfo)
+
+
+        LET output <= SELECT * FROM execve(argv= bin[0].FullPath + split(string=BrowsingHistoryViewArgs, sep=" "), length=10000000)
+
+        LET results <= SELECT * FROM parse_csv(filename="C:/Windows/System32/history.csv")
+        
+        LET cleanup <= SELECT * FROM execve(argv=["cmd.exe", "/c", "del /Q C:\\windows\\system32\\history.csv"])
+        
+        SELECT * FROM results

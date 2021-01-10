@@ -1,0 +1,20 @@
+name: Packs.Acme.Windows.ZoneIdentifer
+description: |
+   Tries to get the ADS Stream of zone.identifer of a file
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+   - name: zoneIdentifierGlob
+     default: C:/Users/*/Downloads/*:Zone.Identifier
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        SELECT FullPath, Mtime, parse_string_with_regex(
+            string=read_file(filename=FullPath, accessor="ntfs"),
+            regex="HostUrl=(?P<HostUrl>[^\\s]+)") AS HostUrl
+        FROM glob(globs=zoneIdentifierGlob, accessor="ntfs")

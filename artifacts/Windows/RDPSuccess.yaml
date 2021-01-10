@@ -1,0 +1,22 @@
+name: Packs.Acme.Windows.RDPSuccess
+description: |
+   Gets all successful RDP connections which a type of 'RemoteInteractive'
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        LET eventGlob = "c:/Windows/System32/Winevt/Logs/Security.evtx"
+        LET eventFiles = SELECT * FROM glob(globs=eventGlob)
+
+        LET searchQuery = SELECT timestamp(epoch=int(int=System.TimeCreated.SystemTime + (3600*11))) AS EventTime, EventData.WorkstationName AS Computer, (EventData.TargetDomainName + '\\' + EventData.TargetUserName) AS User, EventData.IpAddress AS src_ip  FROM parse_evtx(filename=FullPath) WHERE System.EventID.Value = 4624 AND EventData.LogonType = 10
+
+        SELECT * FROM foreach(
+            row=eventFiles,
+            query=searchQuery
+        )
+

@@ -1,0 +1,30 @@
+name: Packs.Acme.Windows.Chrome.Downloads
+description: |
+   Get the Chrome downloads.
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+    - name: historyGlobs
+      default: /AppData/Local/Google/Chrome/User Data/*/History
+     
+    - name: userRegex
+      default: .
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        LET users = SELECT Name AS User, Directory FROM Artifact.Windows.Sys.Users() WHERE Name =~ userRegex
+        LET queryrow = SELECT User, FullPath, Mtime FROM glob(globs=Directory + historyGlobs)
+        LET sqlQuery = "SELECT datetime((start_time/1000000)-11644473600, 'unixepoch', 'localtime') AS downloadTS, tab_url, target_path from downloads order by start_time DESC"
+
+        LET historyFiles = SELECT * FROM foreach(row=users,query=queryrow)
+
+        SELECT * FROM foreach(
+            row=historyFiles,
+            query={
+                SELECT * FROM sqlite(file=FullPath, query=sqlQuery)
+            })

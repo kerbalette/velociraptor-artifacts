@@ -1,0 +1,47 @@
+name: Packs.Acme.Generic.VelociraptorConfig
+description: |
+   Get Velociraptor Configuration Components, versions, and Hash regardless of agent OS
+
+type: CLIENT
+
+required_permissions:
+  - EXECVE
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows' OR OS = 'linux' OR OS = 'darwin'
+
+    query: |
+      LET osInfo <= SELECT * FROM info()
+      LET velociraptorExecutable <= SELECT fileName FROM switch(
+                                    a={SELECT "/opt/velociraptor/bin/velociraptor" AS fileName FROM osInfo WHERE OS = "linux"},
+                                    b={SELECT "c:\\Program Files\\Velociraptor\\velociraptor.exe" AS fileName FROM osInfo WHERE OS = "windows"},
+                                    c={SELECT "/Library/Application Support/Velociraptor/velociraptor" AS fileName FROM osInfo WHERE OS = "darwin"})
+
+      LET ExecFile  <= get(item=dict(
+                                    linux=["/bin/bash", "-c"],
+                                    windows=["cmd.exe", "/c"],
+                                    darwin=["/bin/bash", "-c"]
+                                    ),
+                          member=osInfo[0].OS,
+                          default="Unknown")
+                
+      LET newdeviceHostname <= SELECT * FROM execve(argv= [ExecFile[0], ExecFile[1], "hostname"])
+     
+      
+      LET deviceHostname = SELECT regex_replace(source=Stdout,re="\\r\\n",replace="") AS results FROM newdeviceHostname
+      
+
+      LET osPlatform <= SELECT OS FROM info()
+
+      SELECT timestamp(epoch=now()) AS timestamp,join(array=deviceHostname.results) AS deviceHostname, 
+      join(array=osPlatform.OS) AS osPlatform, config.version.version AS VeloVersion, 
+      config.version.commit AS VeloCommit, config.version.build_time AS VeloBuildTime, 
+      join(array=config.server_urls) as server_urls, config.writeback_darwin,
+      config.writeback_linux, config.writeback_windows, config.tempdir_linux, config.tempdir_windows,
+      config.tempdir_darwin, 
+      hash(path=velociraptorExecutable.fileName, accessor=file).SHA256 AS SHA256Hash,
+      join(array=velociraptorExecutable.fileName) AS fileName
+          FROM scope()
+
+

@@ -1,0 +1,32 @@
+name: Packs.Acme.Windows.Firefox.History
+description: |
+   Extracts browser history from Firefox
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+   - name: userRegex
+     default: .
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        LET historyGlobs = "\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\places.sqlite"
+        LET sqlQuery = "SELECT datetime(hv.visit_date/1000000, 'unixepoch','localtime') as dt, p.title, p.description, p.visit_count, p.typed, p.url AS visited_url FROM moz_historyvisits hv INNER JOIN moz_places p ON hv.place_id = p.id ORDER BY dt DESC;"
+
+        LET history_files = SELECT * FROM foreach(
+            row={
+                SELECT Uid, Name AS User, Directory
+                    FROM Artifact.Windows.Sys.Users()
+                    WHERE Name =~ userRegex},
+            query={
+                SELECT User, FullPath, Mtime FROM glob(
+                    globs=Directory + historyGlobs)}
+        )
+    
+        SELECT * FROM foreach(
+            row=history_files,
+            query={SELECT User, FullPath, dt, title, description, visit_count, typed, visited_url FROM sqlite(file=FullPath, query=sqlQuery)})

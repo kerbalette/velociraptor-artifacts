@@ -1,0 +1,27 @@
+name: Packs.Acme.Windows.Sysmon.FileStreamCreated
+description: |
+   Get the zone information for all files downloads along with the associated application
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+   - name: EventLog
+     default: c:\Windows\System32\Winevt\Logs\Microsoft-Windows-Sysmon%4Operational.evtx
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        LET results = SELECT System.Computer AS Computer, EventData.Image AS Image, EventData.TargetFilename AS TargetFilename,EventData.CreationUtcTime AS EventTime, EventData.Hash AS Hash, 
+            EventData.Contents AS Contents,
+            parse_string_with_regex(regex="ReferrerUrl=(?P<referrerUrl>.*) HostUrl=(?P<HostUrl>.*)$", string=EventData.Contents) AS NewContents,
+            parse_string_with_regex(regex="^MD5=(?P<MD5>\\w{32}),SHA256=(?P<SHA256>\\w{64}),IMPHASH=(?P<IMPHASH>\\w{32})$", string=EventData.Hash) AS NewHashes
+            FROM parse_evtx(filename=EventLog) 
+                    WHERE System.EventID.Value = 15 AND
+                        Contents =~ "[ZoneTransfer]"
+                        
+        SELECT Computer, Image, TargetFilename, EventTime, Hash.MD5 AS MD5, Hash.SHA256 AS SHA256, Hash.IMPHASH AS ImpHash, NewContents.referrerUrl AS referrerUrl, NewContents.HostUrl, NewHashes.MD5,NewHashes.SHA256,NewHashes.IMPHASH
+            FROM results                
+                WHERE referrerUrl =~ ""

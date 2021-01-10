@@ -1,0 +1,17 @@
+name: Packs.Acme.MacOS.GetHash
+description: |
+   Get the hash of a given OS X File
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+   - name: fileGlob
+     default: ''
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'darwin'
+
+    query: |
+      SELECT FullPath, Inode, Mode, Size, Mtime, hash(path=fileGlob, accessor=Accessor) AS Hash FROM glob(globs=fileGlob)

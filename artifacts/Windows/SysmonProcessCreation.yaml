@@ -1,0 +1,26 @@
+name: Packs.Acme.Windows.Sysmon.ProcessCreation
+description: |
+   Get all the processes and the parentPIDs
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+   - name: EventLog
+     default: c:\Windows\System32\Winevt\Logs\Microsoft-Windows-Sysmon%4Operational.evtx
+   - name: DateAfter
+     description: "search for events after this date. YYYY-MM-DDTmm:hh:ss Z"
+     type: timestamp
+   - name: DateBefore
+     description: "search for events before this date. YYYY-MM-DDTmm:hh:ss Z"
+     type: timestamp     
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'windows'
+
+    query: |
+        SELECT  EventData.UtcTime AS EventTime, System.Computer AS Computer, EventData.Image AS Image, EventData.CommandLine AS CommandLine, 
+            EventData.Hashes AS Hashes, EventData.User AS User,EventData.ParentCommandLine AS ParentCommandLine 
+            FROM parse_evtx(filename=EventLog, accessor="file") 
+                WHERE System.EventID.Value = 1

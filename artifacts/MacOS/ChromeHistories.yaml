@@ -1,0 +1,44 @@
+name: Packs.Acme.MacOS.Chrome.History
+description: |
+   Extract the Chrome Browser history from client for OS X machines across all or one User account
+
+# Can be CLIENT, CLIENT_EVENT, SERVER, SERVER_EVENT
+type: CLIENT
+
+parameters:
+   - name: urlSQLQuery
+     default: "SELECT url as visited_url, title, visit_count, typed_count, last_visit_time FROM urls"
+     
+   - name: historyGlobs
+     default: /Library/Application Support/Google/Chrome/Default/History
+     
+   - name: userRegex
+     default: .
+
+sources:
+  - precondition:
+      SELECT OS From info() where OS = 'darwin'
+
+    query: |
+        LET history_files = SELECT * FROM foreach(
+        row={
+            SELECT Name AS User, RealName, UserShell, HomeDir, AppleId 
+                FROM Artifact.MacOS.System.Users()
+                WHERE Name =~ userRegex
+            },
+        query={
+            SELECT User, FullPath FROM glob(globs=HomeDir + historyGlobs)})
+
+
+        SELECT * FROM foreach(
+            row=history_files,
+            query={
+                SELECT User, FullPath,
+                    visited_url,
+                    title, visit_count, typed_count,
+                    timestamp(winfiletime=last_visit_time * 10) as last_visit_time
+                    FROM sqlite(
+                        file=FullPath,
+                        query=urlSQLQuery)
+                
+            })
